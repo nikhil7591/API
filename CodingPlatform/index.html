@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Compiler</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 800px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        #language-select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+        }
+        #code-editor {
+            width: 100%;
+            height: 300px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        #output-console {
+            margin-top: 20px;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            min-height: 100px;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap; /* To wrap long lines */
+            word-wrap: break-word;
+        }
+        #compile-btn {
+            display: block;
+            width: 120px;
+            padding: 10px 15px;
+            border: none;
+            background-color: #ffc107;
+            color: black;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-top: 20px;
+            transition: background-color 0.2s;
+        }
+        #compile-btn:hover {
+            background-color: #e0a800;
+        }
+        .output-error {
+            color: #ff5b5b;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Write a program to find factorial of a number</h1>
+        <div class="editor-header">
+            <h2>Type Your Code</h2>
+            <select id="language-select">
+                <option value="0">Python</option>
+                <option value="4">JavaScript</option>
+                <option value="7">C</option>
+                <option value="77">C++</option>
+                <option value="8">Java</option>
+            </select>
+        </div>
+        <textarea id="code-editor" placeholder="# Write your code here"></textarea>
+        <div id="output-console">OUTPUT:</div>
+        <button id="compile-btn">Compile</button>
+    </div>
+
+    <script>
+        const codeEditor = document.getElementById('code-editor');
+        const languageSelect = document.getElementById('language-select');
+        const compileBtn = document.getElementById('compile-btn');
+        const outputConsole = document.getElementById('output-console');
+
+        compileBtn.addEventListener('click', async () => {
+            const code = codeEditor.value;
+            const langId = languageSelect.value;
+
+            if (!code.trim()) {
+                outputConsole.textContent = 'Error: Code cannot be empty.';
+                outputConsole.classList.add('output-error');
+                return;
+            }
+
+            outputConsole.textContent = 'Compiling...';
+            outputConsole.classList.remove('output-error');
+
+            try {
+                const response = await fetch('https://codequotient.com/api/executeCode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ code, langId })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    outputConsole.textContent = `Error: ${data.error}`;
+                    outputConsole.classList.add('output-error');
+                } else if (data.codeId) {
+                    pollForResult(data.codeId);
+                }
+
+            } catch (error) {
+                outputConsole.textContent = `Network Error: ${error.message}. This might be a CORS issue.`;
+                outputConsole.classList.add('output-error');
+            }
+        });
+
+        function pollForResult(codeId) {
+            let attempts = 0;
+            const maxAttempts = 15; // Poll for 30 seconds max (15 attempts * 2s interval)
+
+            const intervalId = setInterval(async () => {
+                if (attempts >= maxAttempts) {
+                    clearInterval(intervalId);
+                    outputConsole.textContent = 'Error: Request timed out. The server took too long to respond.';
+                    outputConsole.classList.add('output-error');
+                    return;
+                }
+                attempts++;
+
+                try {
+                    const response = await fetch(`https://codequotient.com/api/codeResult/${codeId}`);
+                    const result = await response.json();
+                    const resultData = result.data;
+
+                    if (resultData && (typeof resultData.output !== 'undefined' || typeof resultData.errors !== 'undefined')) {
+                        clearInterval(intervalId); // Stop polling
+                        if (resultData.output) {
+                            outputConsole.textContent = `OUTPUT: ${resultData.output}`;
+                            outputConsole.classList.remove('output-error');
+                        } else {
+                            outputConsole.textContent = `ERRORS: ${resultData.errors || 'No errors reported.'}`;
+                            outputConsole.classList.add('output-error');
+                        }
+                    } else {
+                        // If not ready, just let the interval run again.
+                        outputConsole.textContent = `Processing... Attempt ${attempts}/${maxAttempts}`;
+                    }
+                } catch (error) {
+                    clearInterval(intervalId);
+                    outputConsole.textContent = `Error fetching result: ${error.message}`;
+                    outputConsole.classList.add('output-error');
+                }
+            }, 2000); // Poll every 2 seconds
+        }
+    </script>
+
+</body>
+</html>

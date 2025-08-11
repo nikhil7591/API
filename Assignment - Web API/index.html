@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Sample</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 600px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #github-form {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        #username-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        #github-form button {
+            padding: 10px 15px;
+            border: none;
+            background-color: #28a745;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-left: 10px;
+        }
+        #github-form button:hover {
+            background-color: #218838;
+        }
+        #user-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        #user-info img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin-right: 20px;
+        }
+        #repos-container h2 {
+            margin-bottom: 10px;
+        }
+        #repos-list {
+            list-style: none;
+            padding: 0;
+            display: flex;
+            flex-wrap: wrap;
+        }
+        #repos-list li {
+            margin: 5px;
+        }
+        #repos-list a {
+            text-decoration: none;
+            color: white;
+            background-color: #dc3545;
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: inline-block;
+            transition: background-color 0.2s;
+        }
+        #repos-list a:hover {
+            background-color: #c82333;
+        }
+        #error-message {
+            color: red;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>API Sample</h1>
+        <form id="github-form">
+            <input type="text" id="username-input" placeholder="Github username..." required>
+            <button type="submit">Pull User Data</button>
+        </form>
+        <div id="user-info"></div>
+        <div id="repos-container"></div>
+        <div id="error-message"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('github-form');
+        const usernameInput = document.getElementById('username-input');
+        const userInfoDiv = document.getElementById('user-info');
+        const reposContainer = document.getElementById('repos-container');
+        const errorMessageDiv = document.getElementById('error-message');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = usernameInput.value.trim();
+            if (!username) return;
+
+            // Clear previous results
+            userInfoDiv.innerHTML = '';
+            reposContainer.innerHTML = '';
+            errorMessageDiv.innerHTML = '';
+
+            try {
+                // Fetch user data and repos simultaneously
+                const [userResponse, reposResponse] = await Promise.all([
+                    fetch(`https://api.github.com/users/${username}`),
+                    fetch(`https://api.github.com/users/${username}/repos`)
+                ]);
+
+                if (!userResponse.ok || !reposResponse.ok) {
+                    throw new Error('User not found or API error.');
+                }
+
+                const userData = await userResponse.json();
+                const reposData = await reposResponse.json();
+
+                displayUserInfo(userData);
+                displayRepos(reposData);
+
+            } catch (error) {
+                errorMessageDiv.textContent = `Error: ${error.message}`;
+            }
+        });
+
+        function displayUserInfo(user) {
+            const userHTML = `
+                <img src="${user.avatar_url}" alt="User Avatar">
+                <div>
+                    <h2>${user.name || user.login} (@${user.login})</h2>
+                    <p>Followers: ${user.followers} - Following: ${user.following}</p>
+                    <p>Repos: ${user.public_repos}</p>
+                </div>
+            `;
+            userInfoDiv.innerHTML = userHTML;
+        }
+
+        function displayRepos(repos) {
+            if (repos.length === 0) {
+                reposContainer.innerHTML = '<h2>No public repositories found.</h2>';
+                return;
+            }
+
+            const reposList = repos.map(repo => `
+                <li>
+                    <a href="${repo.html_url}" target="_blank">${repo.name}</a>
+                </li>
+            `).join('');
+
+            reposContainer.innerHTML = `
+                <h2>Repos List:</h2>
+                <ul id="repos-list">${reposList}</ul>
+            `;
+        }
+    </script>
+
+</body>
+</html>
